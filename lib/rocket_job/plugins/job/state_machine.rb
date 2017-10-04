@@ -48,13 +48,17 @@ module RocketJob
             end
 
             event :fail do
-              transitions from: :queued, to: :failed
-              transitions from: :running, to: :failed
-              transitions from: :paused, to: :failed
+              transitions from: :running, to: :failed, if: :retryable?
+              transitions from: :queued, to: :failed, if: :retryable?
+              transitions from: :paused, to: :failed, if: :retryable?
+
+              transitions from: :running, to: :aborted, unless: :retryable?
+              transitions from: :queued, to: :aborted, unless: :retryable?
+              transitions from: :paused, to: :aborted, unless: :retryable?
             end
 
             event :retry do
-              transitions from: :failed, to: :queued
+              transitions from: :failed, to: :queued, if: :retryable?
             end
 
             event :pause do
@@ -87,6 +91,10 @@ module RocketJob
           # By default all jobs are not pausable / resumable
           class_attribute(:pausable)
           self.pausable = false
+
+          # By default all jobs are retryable
+          class_attribute(:retryable)
+          self.retryable = true
 
           # Define a before and after callback method for each event
           state_machine_define_event_callbacks(*aasm.state_machine.events.keys)
